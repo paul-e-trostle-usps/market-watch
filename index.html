@@ -113,17 +113,31 @@ const CRYPTO = [
   { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin' }
 ];
 
-async function fetchStocks() {
-  const symbols = STOCKS.map(s => s.symbol).join(',');
-  const url = `https://proxy.cors.dev/?https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbols)}`;
+async function fetchOneStock(symbol) {
+  const url = `https://proxy.cors.dev/?https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
   try {
     const res = await fetch(url);
+    if (!res.ok) return null;
     const data = await res.json();
-    return data.quoteResponse?.result || [];
+    const meta = data?.chart?.result?.[0]?.meta;
+    if (!meta) return null;
+    return {
+      symbol: symbol,
+      regularMarketPrice: meta.regularMarketPrice,
+      regularMarketChange: meta.regularMarketPrice - (meta.chartPreviousClose || meta.previousClose || meta.regularMarketPrice),
+      regularMarketChangePercent: meta.regularMarketPrice && (meta.chartPreviousClose || meta.previousClose)
+        ? ((meta.regularMarketPrice - (meta.chartPreviousClose || meta.previousClose)) / (meta.chartPreviousClose || meta.previousClose)) * 100
+        : 0
+    };
   } catch (e) {
-    console.error('Stocks error', e);
-    return [];
+    console.error('Stock error', symbol, e);
+    return null;
   }
+}
+
+async function fetchStocks() {
+  const results = await Promise.all(STOCKS.map(s => fetchOneStock(s.symbol)));
+  return results.filter(Boolean);
 }
 
 async function fetchCrypto() {
