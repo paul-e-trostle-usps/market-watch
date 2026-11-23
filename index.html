@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Watch</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --green: #3fb950;
+    --red: #f85149;
+    --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 16px;
+    line-height: 1.4;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  h1 { font-size: 1.6rem; font-weight: 600; }
+  .status { color: var(--muted); font-size: 0.85rem; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: var(--accent); }
+  .symbol { font-weight: 600; font-size: 1rem; margin-bottom: 4px; }
+  .name { color: var(--muted); font-size: 0.75rem; margin-bottom: 8px; }
+  .price { font-size: 1.35rem; font-weight: 600; margin-bottom: 4px; }
+  .change { font-size: 0.9rem; font-weight: 500; }
+  .up { color: var(--green); }
+  .down { color: var(--red); }
+  .flat { color: var(--muted); }
+  .refresh {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  .refresh:hover { border-color: var(--accent); }
+  footer {
+    margin-top: 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.75rem;
+  }
+  @media (max-width: 480px) {
+    .grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Market Watch</h1>
+  <div>
+    <span class="status" id="status">Loading...</span>
+    <button class="refresh" onclick="loadData()">Refresh</button>
+  </div>
+</header>
+<div class="grid" id="grid"></div>
+<footer>Data from Yahoo Finance & CoinGecko · Auto-refreshes every 60s · Not financial advice</footer>
+
+<script>
+const STOCKS = [
+  { symbol: '^GSPC', name: 'S&P 500', type: 'stock' },
+  { symbol: '^DJI', name: 'Dow Jones', type: 'stock' },
+  { symbol: '^IXIC', name: 'Nasdaq', type: 'stock' },
+  { symbol: '^VIX', name: 'VIX', type: 'stock' },
+  { symbol: 'GC=F', name: 'Gold', type: 'stock' },
+  { symbol: '^TNX', name: '10Y Yield', type: 'stock' }
+];
+
+const CRYPTO = [
+  { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+  { id: 'ethereum', symbol: 'ETH', name: 'Ethereum' },
+  { id: 'solana', symbol: 'SOL', name: 'Solana' },
+  { id: 'ripple', symbol: 'XRP', name: 'XRP' },
+  { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin' }
+];
+
+async function fetchStocks() {
+  const symbols = STOCKS.map(s => s.symbol).join(',');
+  const url = `https://proxy.cors.dev/?https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbols)}`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    return data.quoteResponse?.result || [];
+  } catch (e) {
+    console.error('Stocks error', e);
+    return [];
+  }
+}
+
+async function fetchCrypto() {
+  const ids = CRYPTO.map(c => c.id).join(',');
+  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`;
+  try {
+    const res = await fetch(url);
+    return await res.json();
+  } catch (e) {
+    console.error('Crypto error', e);
+    return {};
+  }
+}
+
+function formatPrice(price, symbol) {
+  if (price == null) return '—';
+  if (symbol === '^TNX') return price.toFixed(2) + '%';
+  if (price >= 1000) return price.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  if (price >= 1) return price.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return price.toFixed(4);
+}
+
+function formatChange(change, pct) {
+  if (change == null && pct == null) return { text: '—', cls: 'flat' };
+  const sign = (pct ?? change) >= 0 ? '+' : '';
+  const cls = (pct ?? change) > 0 ? 'up' : (pct ?? change) < 0 ? 'down' : 'flat';
+  let text = '';
+  if (change != null) text += sign + change.toFixed(2);
+  if (pct != null) text += (text ? ' ' : '') + '(' + sign + pct.toFixed(2) + '%)';
+  return { text, cls };
+}
+
+function renderCard(symbol, name, price, changeInfo) {
+  return `
+    <div class="card">
+      <div class="symbol">${symbol}</div>
+      <div class="name">${name}</div>
+      <div class="price">${price}</div>
+      <div class="change ${changeInfo.cls}">${changeInfo.text}</div>
+    </div>
+  `;
+}
+
+async function loadData() {
+  const status = document.getElementById('status');
+  const grid = document.getElementById('grid');
+  status.textContent = 'Updating...';
+  grid.innerHTML = '';
+
+  const [stockData, cryptoData] = await Promise.all([fetchStocks(), fetchCrypto()]);
+
+  let html = '';
+
+  // Stocks
+  for (const s of STOCKS) {
+    const q = stockData.find(x => x.symbol === s.symbol);
+    const price = q ? formatPrice(q.regularMarketPrice, s.symbol) : '—';
+    const changeInfo = q ? formatChange(q.regularMarketChange, q.regularMarketChangePercent) : { text: '—', cls: 'flat' };
+    html += renderCard(s.symbol.replace('^','').replace('=F',''), s.name, price, changeInfo);
+  }
+
+  // Crypto
+  for (const c of CRYPTO) {
+    const d = cryptoData[c.id];
+    const price = d ? formatPrice(d.usd, c.symbol) : '—';
+    const changeInfo = d ? formatChange(null, d.usd_24h_change) : { text: '—', cls: 'flat' };
+    html += renderCard(c.symbol, c.name, price, changeInfo);
+  }
+
+  grid.innerHTML = html;
+  status.textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+loadData();
+setInterval(loadData, 60000);
+</script>
+</body>
+</html>
