@@ -51,7 +51,7 @@
   }
   .open { background: #238636; color: white; }
   .closed { background: #6e7681; color: white; }
-  .refresh {
+  .refresh, .sort-btn {
     background: var(--card);
     border: 1px solid var(--border);
     color: var(--text);
@@ -60,17 +60,17 @@
     cursor: pointer;
     font-size: 0.8rem;
   }
-  .refresh:hover { border-color: var(--accent); }
-  .movers {
+  .refresh:hover, .sort-btn:hover { border-color: var(--accent); }
+  .sort-btn.active { border-color: var(--crash); background: #2d1a1a; }
+  .movers, .portfolio-summary, .news {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 8px 12px;
     margin-bottom: 16px;
     font-size: 0.8rem;
-    overflow-x: auto;
-    white-space: nowrap;
   }
+  .movers { overflow-x: auto; white-space: nowrap; }
   .mover { margin-right: 16px; }
   .section {
     margin-bottom: 20px;
@@ -117,23 +117,25 @@
   }
   .badge.crash { background: var(--crash); color: white; }
   .badge.opp { background: var(--green); color: white; }
+  .badge.trend { background: var(--accent); color: white; top: 28px; }
   .spark { width: 100%; height: 32px; margin-top: 6px; }
-  .add-box {
+  .add-box, .portfolio-input {
     margin: 12px 0;
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+    align-items: center;
   }
-  .add-box input {
+  .add-box input, .portfolio-input input {
     background: var(--card);
     border: 1px solid var(--border);
     color: var(--text);
     padding: 8px 10px;
     border-radius: 6px;
     flex: 1;
-    min-width: 120px;
+    min-width: 100px;
   }
-  .add-box button {
+  .add-box button, .portfolio-input button {
     background: var(--accent);
     color: white;
     border: none;
@@ -154,6 +156,12 @@
     opacity: 0.6;
   }
   .remove:hover { color: var(--red); opacity: 1; }
+  .shares-input {
+    width: 60px;
+    margin-top: 4px;
+    font-size: 0.75rem;
+    padding: 2px 4px;
+  }
   #chart-container {
     margin-top: 20px;
     background: var(--card);
@@ -162,6 +170,14 @@
     overflow: hidden;
     height: 420px;
   }
+  .news-item {
+    margin: 4px 0;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .news-item a { color: var(--accent); text-decoration: none; }
+  .news-item a:hover { text-decoration: underline; }
+  .news-meta { color: var(--muted); font-size: 0.7rem; }
   footer {
     margin-top: 20px;
     text-align: center;
@@ -180,9 +196,12 @@
   <div class="status-bar">
     <span class="market-status" id="marketStatus">...</span>
     <span id="status">Loading...</span>
+    <button class="sort-btn" id="sortCrash" onclick="toggleSortCrash()">Sort by Biggest Crash</button>
     <button class="refresh" onclick="loadData()">Refresh</button>
   </div>
 </header>
+
+<div class="portfolio-summary" id="portfolioSummary">Portfolio: loading...</div>
 
 <div class="movers" id="movers">Top movers loading...</div>
 
@@ -193,13 +212,18 @@
 
 <div id="sections"></div>
 
+<div class="news" id="news">
+  <h2 style="margin-bottom:8px;color:var(--accent);">Market News Headlines</h2>
+  <div id="newsList">Loading headlines...</div>
+</div>
+
 <div id="chart-container">
   <div class="tradingview-widget-container" style="height:100%;width:100%">
     <div id="tradingview_widget" style="height:100%;width:100%"></div>
   </div>
 </div>
 
-<footer>Data from Yahoo Finance & CoinGecko · Auto-refreshes every 60s · Click any card for chart · Not financial advice</footer>
+<footer>Data from Yahoo Finance, CoinGecko & Quotelinks · Auto-refreshes every 60s · Click any card for chart · Simple trend based on 5d · Not financial advice</footer>
 
 <script>
 const DEFAULTS = {
@@ -235,14 +259,15 @@ const DEFAULTS = {
 };
 
 let custom = JSON.parse(localStorage.getItem('mw_custom') || '[]');
+let holdings = JSON.parse(localStorage.getItem('mw_holdings') || '{}');
+let sortByCrash = localStorage.getItem('mw_sortCrash') === 'true';
 
-function saveCustom() {
-  localStorage.setItem('mw_custom', JSON.stringify(custom));
-}
+function saveCustom() { localStorage.setItem('mw_custom', JSON.stringify(custom)); }
+function saveHoldings() { localStorage.setItem('mw_holdings', JSON.stringify(holdings)); }
+function saveSort() { localStorage.setItem('mw_sortCrash', sortByCrash); }
 
 function getAllStocks() {
-  const stocks = [...DEFAULTS.indices, ...DEFAULTS.ai, ...DEFAULTS.defensive, ...custom.filter(c => !c.crypto)];
-  return stocks;
+  return [...DEFAULTS.indices, ...DEFAULTS.ai, ...DEFAULTS.defensive, ...custom.filter(c => !c.crypto)];
 }
 
 async function fetchOneStock(symbol) {
@@ -256,14 +281,14 @@ async function fetchOneStock(symbol) {
     const meta = result.meta;
     const closes = result.indicators?.quote?.[0]?.close || [];
     const spark = closes.filter(c => c != null).slice(-5);
+    const price = meta.regularMarketPrice;
+    const prev = meta.chartPreviousClose || meta.previousClose;
     return {
       symbol,
-      price: meta.regularMarketPrice,
-      prev: meta.chartPreviousClose || meta.previousClose,
-      change: meta.regularMarketPrice - (meta.chartPreviousClose || meta.previousClose || meta.regularMarketPrice),
-      pct: meta.regularMarketPrice && (meta.chartPreviousClose || meta.previousClose)
-        ? ((meta.regularMarketPrice - (meta.chartPreviousClose || meta.previousClose)) / (meta.chartPreviousClose || meta.previousClose)) * 100
-        : 0,
+      price,
+      prev,
+      change: price - (prev || price),
+      pct: price && prev ? ((price - prev) / prev) * 100 : 0,
       spark
     };
   } catch (e) {
@@ -273,7 +298,7 @@ async function fetchOneStock(symbol) {
 }
 
 async function fetchCrypto() {
-  const ids = [...DEFAULTS.crypto.map(c => c.id), ...custom.filter(c => c.crypto).map(c => c.id)].join(',');
+  const ids = [...DEFAULTS.crypto.map(c => c.id), ...custom.filter(c => c.crypto).map(c => c.id)].filter(Boolean).join(',');
   if (!ids) return {};
   const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`;
   try {
@@ -281,6 +306,22 @@ async function fetchCrypto() {
     return await res.json();
   } catch (e) {
     return {};
+  }
+}
+
+async function fetchNews() {
+  try {
+    const res = await fetch('https://api.quotelinks.com/v1/news/latest');
+    if (!res.ok) throw new Error('news fail');
+    const data = await res.json();
+    return (data.articles || data || []).slice(0, 8);
+  } catch (e) {
+    // Fallback simple links
+    return [
+      { title: 'Yahoo Finance Markets', url: 'https://finance.yahoo.com/news/' },
+      { title: 'CNBC Markets', url: 'https://www.cnbc.com/markets/' },
+      { title: 'CoinDesk Crypto', url: 'https://www.coindesk.com/' }
+    ];
   }
 }
 
@@ -316,6 +357,16 @@ function sparkSVG(data, color) {
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline fill="none" stroke="${color}" stroke-width="1.5" points="${points}"/></svg>`;
 }
 
+function getTrend(spark) {
+  if (!spark || spark.length < 2) return '';
+  const first = spark[0];
+  const last = spark[spark.length - 1];
+  const chg = ((last - first) / first) * 100;
+  if (chg > 3) return 'UP TREND';
+  if (chg < -3) return 'DOWN TREND';
+  return 'FLAT';
+}
+
 function renderCard(item, q, isCrypto = false, isCustom = false) {
   const symbol = isCrypto ? item.symbol : item.symbol.replace('^','').replace('=F','');
   const price = q ? formatPrice(isCrypto ? q.usd : q.price, item.symbol) : '—';
@@ -326,20 +377,46 @@ function renderCard(item, q, isCrypto = false, isCustom = false) {
   if (pct <= -8) { badge = '<span class="badge crash">CRASH</span>'; extraClass = 'crash'; }
   else if (pct <= -5) { badge = '<span class="badge crash">BIG DROP</span>'; extraClass = 'crash'; }
   else if (pct >= 5) { badge = '<span class="badge opp">BIG MOVE</span>'; extraClass = 'bigup'; }
+  const trend = (!isCrypto && q?.spark) ? getTrend(q.spark) : '';
+  const trendBadge = trend ? `<span class="badge trend">${trend}</span>` : '';
   const spark = (!isCrypto && q?.spark) ? sparkSVG(q.spark, pct >= 0 ? '#3fb950' : '#f85149') : '';
   const removeBtn = isCustom ? `<button class="remove" onclick="event.stopPropagation();removeTicker('${item.symbol || item.id}')">×</button>` : '';
   const chartSym = isCrypto ? item.symbol + 'USD' : item.symbol;
+  const holdKey = item.symbol || item.id;
+  const shares = holdings[holdKey]?.shares || '';
+  const sharesInput = `<input type="number" class="shares-input" placeholder="shares" value="${shares}" onchange="updateShares('${holdKey}', this.value)" onclick="event.stopPropagation()">`;
   return `
     <div class="card ${extraClass}" onclick="showChart('${chartSym}')">
       ${removeBtn}
       ${badge}
+      ${trendBadge}
       <div class="symbol">${symbol}</div>
       <div class="name">${item.name}</div>
       <div class="price">${price}</div>
       <div class="change ${changeInfo.cls}">${changeInfo.text}</div>
       ${spark}
+      ${sharesInput}
     </div>
   `;
+}
+
+function updateShares(key, val) {
+  const num = parseFloat(val) || 0;
+  if (num > 0) holdings[key] = { shares: num };
+  else delete holdings[key];
+  saveHoldings();
+  updatePortfolioSummary();
+}
+
+function updatePortfolioSummary() {
+  // Simple summary based on current data - will refresh on load
+  const el = document.getElementById('portfolioSummary');
+  const keys = Object.keys(holdings);
+  if (!keys.length) {
+    el.innerHTML = 'Portfolio: No holdings entered. Add shares on any card.';
+    return;
+  }
+  el.innerHTML = `Portfolio: ${keys.length} position(s) tracked. Enter shares on cards for daily P&L estimate.`;
 }
 
 function updateMarketStatus() {
@@ -349,7 +426,7 @@ function updateMarketStatus() {
   const hours = et.getHours();
   const mins = et.getMinutes();
   const time = hours * 60 + mins;
-  const isOpen = day >= 1 && day <= 5 && time >= 570 && time < 960; // 9:30-16:00
+  const isOpen = day >= 1 && day <= 5 && time >= 570 && time < 960;
   const el = document.getElementById('marketStatus');
   el.textContent = isOpen ? 'Market Open' : 'Market Closed';
   el.className = 'market-status ' + (isOpen ? 'open' : 'closed');
@@ -360,7 +437,7 @@ function showChart(symbol) {
   container.innerHTML = '';
   new TradingView.widget({
     "autosize": true,
-    "symbol": symbol.includes('USD') ? symbol : symbol,
+    "symbol": symbol,
     "interval": "D",
     "timezone": "America/New_York",
     "theme": "dark",
@@ -379,11 +456,11 @@ function addTicker() {
   let val = input.value.trim().toUpperCase();
   if (!val) return;
   if (custom.some(c => (c.symbol || c.id) === val || c.symbol === val)) return;
-  const isCrypto = val.includes('-USD') || ['BTC','ETH','SOL','XRP','DOGE'].includes(val);
-  if (isCrypto) {
-    const idMap = { BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana', XRP: 'ripple', DOGE: 'dogecoin' };
-    const id = idMap[val.replace('-USD','')] || val.toLowerCase();
-    custom.push({ id, symbol: val.replace('-USD',''), name: val, crypto: true });
+  const cryptoMap = { 'BTC': 'bitcoin', 'BTC-USD': 'bitcoin', 'ETH': 'ethereum', 'ETH-USD': 'ethereum', 'SOL': 'solana', 'SOL-USD': 'solana', 'XRP': 'ripple', 'XRP-USD': 'ripple', 'DOGE': 'dogecoin', 'DOGE-USD': 'dogecoin' };
+  if (cryptoMap[val] || val.includes('-USD')) {
+    const id = cryptoMap[val] || val.replace('-USD','').toLowerCase();
+    const sym = val.replace('-USD','');
+    custom.push({ id, symbol: sym, name: val, crypto: true });
   } else {
     custom.push({ symbol: val, name: val });
   }
@@ -398,29 +475,41 @@ function removeTicker(sym) {
   loadData();
 }
 
+function toggleSortCrash() {
+  sortByCrash = !sortByCrash;
+  saveSort();
+  document.getElementById('sortCrash').classList.toggle('active', sortByCrash);
+  loadData();
+}
+
 async function loadData() {
   updateMarketStatus();
+  document.getElementById('sortCrash').classList.toggle('active', sortByCrash);
   const status = document.getElementById('status');
   status.textContent = 'Updating...';
   const sectionsEl = document.getElementById('sections');
   const moversEl = document.getElementById('movers');
+  const newsList = document.getElementById('newsList');
 
   const stocks = getAllStocks();
   const stockPromises = stocks.map(s => fetchOneStock(s.symbol).then(q => ({ ...s, q })));
-  const [stockResults, cryptoData] = await Promise.all([
+  const [stockResults, cryptoData, newsItems] = await Promise.all([
     Promise.all(stockPromises),
-    fetchCrypto()
+    fetchCrypto(),
+    fetchNews()
   ]);
 
   const allItems = [];
-
-  // Build sections
   let html = '';
 
   function addSection(title, items, isCrypto = false) {
     if (!items.length) return;
+    let sortedItems = [...items];
+    if (sortByCrash && !isCrypto) {
+      sortedItems.sort((a, b) => (a.q?.pct || 0) - (b.q?.pct || 0));
+    }
     html += `<div class="section"><h2>${title}</h2><div class="grid">`;
-    for (const item of items) {
+    for (const item of sortedItems) {
       const q = isCrypto ? cryptoData[item.id] : item.q;
       const isCustom = custom.some(c => (c.symbol || c.id) === (item.symbol || item.id));
       html += renderCard(item, q, isCrypto, isCustom);
@@ -439,8 +528,8 @@ async function loadData() {
   if (custom.length) {
     const customStocks = custom.filter(c => !c.crypto).map(c => stockResults.find(r => r.symbol === c.symbol) || c);
     const customCrypto = custom.filter(c => c.crypto);
-    addSection('Your Tickers', [...customStocks, ...customCrypto], false);
-    // Note: crypto custom handled in render if needed - simplified
+    if (customStocks.length) addSection('Your Stocks', customStocks);
+    if (customCrypto.length) addSection('Your Crypto', customCrypto, true);
   }
 
   sectionsEl.innerHTML = html;
@@ -453,6 +542,19 @@ async function loadData() {
     '<strong>Top Gainers:</strong> ' + gainers.map(g => `<span class="mover up">${g.symbol} ${g.pct>=0?'+':''}${g.pct.toFixed(1)}%</span>`).join('') +
     ' &nbsp;|&nbsp; <strong>Biggest Drops:</strong> ' + losers.map(l => `<span class="mover down">${l.symbol} ${l.pct.toFixed(1)}%</span>`).join('');
 
+  // News
+  if (newsItems && newsItems.length) {
+    newsList.innerHTML = newsItems.map(n => `
+      <div class="news-item">
+        <a href="${n.url || n.link}" target="_blank" rel="noopener">${n.title || n.headline}</a>
+        <div class="news-meta">${n.source || n.publisher || ''} · ${n.publishedAt || n.pubDate || ''}</div>
+      </div>
+    `).join('');
+  } else {
+    newsList.innerHTML = '<div class="news-item"><a href="https://finance.yahoo.com/news/" target="_blank">Yahoo Finance News</a></div><div class="news-item"><a href="https://www.cnbc.com/markets/" target="_blank">CNBC Markets</a></div>';
+  }
+
+  updatePortfolioSummary();
   status.textContent = 'Updated ' + new Date().toLocaleTimeString();
 }
 
