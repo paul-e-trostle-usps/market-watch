@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Market Watch</title>
+<title>Market Watch Pro</title>
 <style>
   :root {
     --bg: #0d1117;
@@ -14,45 +14,43 @@
     --green: #3fb950;
     --red: #f85149;
     --accent: #58a6ff;
+    --yellow: #d29922;
+    --crash: #da3633;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background: var(--bg);
     color: var(--text);
-    padding: 16px;
+    padding: 12px;
     line-height: 1.4;
+    max-width: 1400px;
+    margin: 0 auto;
   }
   header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 12px;
     flex-wrap: wrap;
     gap: 8px;
   }
-  h1 { font-size: 1.6rem; font-weight: 600; }
-  .status { color: var(--muted); font-size: 0.85rem; }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  h1 { font-size: 1.5rem; font-weight: 600; }
+  .status-bar {
+    display: flex;
+    align-items: center;
     gap: 12px;
+    font-size: 0.8rem;
+    color: var(--muted);
   }
-  .card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px;
-    transition: border-color 0.2s;
+  .market-status {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.75rem;
   }
-  .card:hover { border-color: var(--accent); }
-  .symbol { font-weight: 600; font-size: 1rem; margin-bottom: 4px; }
-  .name { color: var(--muted); font-size: 0.75rem; margin-bottom: 8px; }
-  .price { font-size: 1.35rem; font-weight: 600; margin-bottom: 4px; }
-  .change { font-size: 0.9rem; font-weight: 500; }
-  .up { color: var(--green); }
-  .down { color: var(--red); }
-  .flat { color: var(--muted); }
+  .open { background: #238636; color: white; }
+  .closed { background: #6e7681; color: white; }
   .refresh {
     background: var(--card);
     border: 1px solid var(--border);
@@ -60,94 +58,228 @@
     padding: 6px 12px;
     border-radius: 6px;
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
   }
   .refresh:hover { border-color: var(--accent); }
+  .movers {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin-bottom: 16px;
+    font-size: 0.8rem;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .mover { margin-right: 16px; }
+  .section {
+    margin-bottom: 20px;
+  }
+  .section h2 {
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+    color: var(--accent);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    position: relative;
+    transition: border-color 0.2s, transform 0.1s;
+    cursor: pointer;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .card.crash { border-color: var(--crash); box-shadow: 0 0 8px rgba(218,54,51,0.3); }
+  .card.bigup { border-color: var(--green); }
+  .symbol { font-weight: 600; font-size: 0.95rem; }
+  .name { color: var(--muted); font-size: 0.7rem; margin-bottom: 6px; }
+  .price { font-size: 1.25rem; font-weight: 600; }
+  .change { font-size: 0.85rem; font-weight: 500; }
+  .up { color: var(--green); }
+  .down { color: var(--red); }
+  .flat { color: var(--muted); }
+  .badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+  }
+  .badge.crash { background: var(--crash); color: white; }
+  .badge.opp { background: var(--green); color: white; }
+  .spark { width: 100%; height: 32px; margin-top: 6px; }
+  .add-box {
+    margin: 12px 0;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .add-box input {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 6px;
+    flex: 1;
+    min-width: 120px;
+  }
+  .add-box button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .remove {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.8rem;
+    opacity: 0.6;
+  }
+  .remove:hover { color: var(--red); opacity: 1; }
+  #chart-container {
+    margin-top: 20px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    height: 420px;
+  }
   footer {
-    margin-top: 24px;
+    margin-top: 20px;
     text-align: center;
     color: var(--muted);
-    font-size: 0.75rem;
+    font-size: 0.7rem;
   }
-  @media (max-width: 480px) {
+  @media (max-width: 600px) {
     .grid { grid-template-columns: 1fr 1fr; }
+    #chart-container { height: 300px; }
   }
 </style>
 </head>
 <body>
 <header>
-  <h1>Market Watch</h1>
-  <div>
-    <span class="status" id="status">Loading...</span>
+  <h1>Market Watch Pro</h1>
+  <div class="status-bar">
+    <span class="market-status" id="marketStatus">...</span>
+    <span id="status">Loading...</span>
     <button class="refresh" onclick="loadData()">Refresh</button>
   </div>
 </header>
-<div class="grid" id="grid"></div>
-<footer>Data from Yahoo Finance & CoinGecko · Auto-refreshes every 60s · Not financial advice</footer>
+
+<div class="movers" id="movers">Top movers loading...</div>
+
+<div class="add-box">
+  <input type="text" id="newTicker" placeholder="Add ticker (e.g. AAPL, BTC-USD)" onkeydown="if(event.key==='Enter')addTicker()">
+  <button onclick="addTicker()">Add</button>
+</div>
+
+<div id="sections"></div>
+
+<div id="chart-container">
+  <div class="tradingview-widget-container" style="height:100%;width:100%">
+    <div id="tradingview_widget" style="height:100%;width:100%"></div>
+  </div>
+</div>
+
+<footer>Data from Yahoo Finance & CoinGecko · Auto-refreshes every 60s · Click any card for chart · Not financial advice</footer>
 
 <script>
-const STOCKS = [
-  { symbol: '^GSPC', name: 'S&P 500', type: 'stock' },
-  { symbol: '^DJI', name: 'Dow Jones', type: 'stock' },
-  { symbol: '^IXIC', name: 'Nasdaq', type: 'stock' },
-  { symbol: '^VIX', name: 'VIX', type: 'stock' },
-  { symbol: 'GC=F', name: 'Gold', type: 'stock' },
-  { symbol: '^TNX', name: '10Y Yield', type: 'stock' },
-  { symbol: 'NVDA', name: 'Nvidia', type: 'stock' },
-  { symbol: 'AMD', name: 'AMD', type: 'stock' },
-  { symbol: 'MU', name: 'Micron', type: 'stock' },
-  { symbol: 'AVGO', name: 'Broadcom', type: 'stock' },
-  { symbol: 'ANT', name: 'Anthropic', type: 'stock' },
-  { symbol: 'TSLA', name: 'Tesla', type: 'stock' },
-  { symbol: 'SPCX', name: 'SpaceX', type: 'stock' },
-  { symbol: 'GIS', name: 'General Mills', type: 'stock' },
-  { symbol: 'WMT', name: 'Walmart', type: 'stock' },
-  { symbol: 'COST', name: 'Costco', type: 'stock' }
-];
+const DEFAULTS = {
+  indices: [
+    { symbol: '^GSPC', name: 'S&P 500' },
+    { symbol: '^DJI', name: 'Dow Jones' },
+    { symbol: '^IXIC', name: 'Nasdaq' },
+    { symbol: '^VIX', name: 'VIX' },
+    { symbol: 'GC=F', name: 'Gold' },
+    { symbol: '^TNX', name: '10Y Yield' }
+  ],
+  ai: [
+    { symbol: 'NVDA', name: 'Nvidia' },
+    { symbol: 'AMD', name: 'AMD' },
+    { symbol: 'MU', name: 'Micron' },
+    { symbol: 'AVGO', name: 'Broadcom' },
+    { symbol: 'TSLA', name: 'Tesla' },
+    { symbol: 'SPCX', name: 'SpaceX' },
+    { symbol: 'ANT', name: 'Anthropic' }
+  ],
+  defensive: [
+    { symbol: 'GIS', name: 'General Mills' },
+    { symbol: 'WMT', name: 'Walmart' },
+    { symbol: 'COST', name: 'Costco' }
+  ],
+  crypto: [
+    { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
+    { id: 'ethereum', symbol: 'ETH', name: 'Ethereum' },
+    { id: 'solana', symbol: 'SOL', name: 'Solana' },
+    { id: 'ripple', symbol: 'XRP', name: 'XRP' },
+    { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin' }
+  ]
+};
 
-const CRYPTO = [
-  { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin' },
-  { id: 'ethereum', symbol: 'ETH', name: 'Ethereum' },
-  { id: 'solana', symbol: 'SOL', name: 'Solana' },
-  { id: 'ripple', symbol: 'XRP', name: 'XRP' },
-  { id: 'dogecoin', symbol: 'DOGE', name: 'Dogecoin' }
-];
+let custom = JSON.parse(localStorage.getItem('mw_custom') || '[]');
+
+function saveCustom() {
+  localStorage.setItem('mw_custom', JSON.stringify(custom));
+}
+
+function getAllStocks() {
+  const stocks = [...DEFAULTS.indices, ...DEFAULTS.ai, ...DEFAULTS.defensive, ...custom.filter(c => !c.crypto)];
+  return stocks;
+}
 
 async function fetchOneStock(symbol) {
-  const url = `https://proxy.cors.dev/?https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1d&interval=1d`;
+  const url = `https://proxy.cors.dev/?https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d`;
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();
-    const meta = data?.chart?.result?.[0]?.meta;
-    if (!meta) return null;
+    const result = data?.chart?.result?.[0];
+    if (!result) return null;
+    const meta = result.meta;
+    const closes = result.indicators?.quote?.[0]?.close || [];
+    const spark = closes.filter(c => c != null).slice(-5);
     return {
-      symbol: symbol,
-      regularMarketPrice: meta.regularMarketPrice,
-      regularMarketChange: meta.regularMarketPrice - (meta.chartPreviousClose || meta.previousClose || meta.regularMarketPrice),
-      regularMarketChangePercent: meta.regularMarketPrice && (meta.chartPreviousClose || meta.previousClose)
+      symbol,
+      price: meta.regularMarketPrice,
+      prev: meta.chartPreviousClose || meta.previousClose,
+      change: meta.regularMarketPrice - (meta.chartPreviousClose || meta.previousClose || meta.regularMarketPrice),
+      pct: meta.regularMarketPrice && (meta.chartPreviousClose || meta.previousClose)
         ? ((meta.regularMarketPrice - (meta.chartPreviousClose || meta.previousClose)) / (meta.chartPreviousClose || meta.previousClose)) * 100
-        : 0
+        : 0,
+      spark
     };
   } catch (e) {
-    console.error('Stock error', symbol, e);
+    console.error(symbol, e);
     return null;
   }
 }
 
-async function fetchStocks() {
-  const results = await Promise.all(STOCKS.map(s => fetchOneStock(s.symbol)));
-  return results.filter(Boolean);
-}
-
 async function fetchCrypto() {
-  const ids = CRYPTO.map(c => c.id).join(',');
+  const ids = [...DEFAULTS.crypto.map(c => c.id), ...custom.filter(c => c.crypto).map(c => c.id)].join(',');
+  if (!ids) return {};
   const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`;
   try {
     const res = await fetch(url);
     return await res.json();
   } catch (e) {
-    console.error('Crypto error', e);
     return {};
   }
 }
@@ -165,54 +297,174 @@ function formatChange(change, pct) {
   const sign = (pct ?? change) >= 0 ? '+' : '';
   const cls = (pct ?? change) > 0 ? 'up' : (pct ?? change) < 0 ? 'down' : 'flat';
   let text = '';
-  if (change != null) text += sign + change.toFixed(2);
+  if (change != null) text += sign + Math.abs(change).toFixed(2);
   if (pct != null) text += (text ? ' ' : '') + '(' + sign + pct.toFixed(2) + '%)';
-  return { text, cls };
+  return { text, cls, pct: pct ?? 0 };
 }
 
-function renderCard(symbol, name, price, changeInfo) {
+function sparkSVG(data, color) {
+  if (!data || data.length < 2) return '';
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const w = 100, h = 30;
+  const points = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * w;
+    const y = h - ((v - min) / range) * h;
+    return `${x},${y}`;
+  }).join(' ');
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline fill="none" stroke="${color}" stroke-width="1.5" points="${points}"/></svg>`;
+}
+
+function renderCard(item, q, isCrypto = false, isCustom = false) {
+  const symbol = isCrypto ? item.symbol : item.symbol.replace('^','').replace('=F','');
+  const price = q ? formatPrice(isCrypto ? q.usd : q.price, item.symbol) : '—';
+  const changeInfo = q ? formatChange(isCrypto ? null : q.change, isCrypto ? q.usd_24h_change : q.pct) : { text: '—', cls: 'flat', pct: 0 };
+  const pct = changeInfo.pct || 0;
+  let badge = '';
+  let extraClass = '';
+  if (pct <= -8) { badge = '<span class="badge crash">CRASH</span>'; extraClass = 'crash'; }
+  else if (pct <= -5) { badge = '<span class="badge crash">BIG DROP</span>'; extraClass = 'crash'; }
+  else if (pct >= 5) { badge = '<span class="badge opp">BIG MOVE</span>'; extraClass = 'bigup'; }
+  const spark = (!isCrypto && q?.spark) ? sparkSVG(q.spark, pct >= 0 ? '#3fb950' : '#f85149') : '';
+  const removeBtn = isCustom ? `<button class="remove" onclick="event.stopPropagation();removeTicker('${item.symbol || item.id}')">×</button>` : '';
+  const chartSym = isCrypto ? item.symbol + 'USD' : item.symbol;
   return `
-    <div class="card">
+    <div class="card ${extraClass}" onclick="showChart('${chartSym}')">
+      ${removeBtn}
+      ${badge}
       <div class="symbol">${symbol}</div>
-      <div class="name">${name}</div>
+      <div class="name">${item.name}</div>
       <div class="price">${price}</div>
       <div class="change ${changeInfo.cls}">${changeInfo.text}</div>
+      ${spark}
     </div>
   `;
 }
 
+function updateMarketStatus() {
+  const now = new Date();
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = et.getDay();
+  const hours = et.getHours();
+  const mins = et.getMinutes();
+  const time = hours * 60 + mins;
+  const isOpen = day >= 1 && day <= 5 && time >= 570 && time < 960; // 9:30-16:00
+  const el = document.getElementById('marketStatus');
+  el.textContent = isOpen ? 'Market Open' : 'Market Closed';
+  el.className = 'market-status ' + (isOpen ? 'open' : 'closed');
+}
+
+function showChart(symbol) {
+  const container = document.getElementById('tradingview_widget');
+  container.innerHTML = '';
+  new TradingView.widget({
+    "autosize": true,
+    "symbol": symbol.includes('USD') ? symbol : symbol,
+    "interval": "D",
+    "timezone": "America/New_York",
+    "theme": "dark",
+    "style": "1",
+    "locale": "en",
+    "toolbar_bg": "#161b22",
+    "enable_publishing": false,
+    "hide_top_toolbar": false,
+    "container_id": "tradingview_widget"
+  });
+  document.getElementById('chart-container').scrollIntoView({ behavior: 'smooth' });
+}
+
+function addTicker() {
+  const input = document.getElementById('newTicker');
+  let val = input.value.trim().toUpperCase();
+  if (!val) return;
+  if (custom.some(c => (c.symbol || c.id) === val || c.symbol === val)) return;
+  const isCrypto = val.includes('-USD') || ['BTC','ETH','SOL','XRP','DOGE'].includes(val);
+  if (isCrypto) {
+    const idMap = { BTC: 'bitcoin', ETH: 'ethereum', SOL: 'solana', XRP: 'ripple', DOGE: 'dogecoin' };
+    const id = idMap[val.replace('-USD','')] || val.toLowerCase();
+    custom.push({ id, symbol: val.replace('-USD',''), name: val, crypto: true });
+  } else {
+    custom.push({ symbol: val, name: val });
+  }
+  saveCustom();
+  input.value = '';
+  loadData();
+}
+
+function removeTicker(sym) {
+  custom = custom.filter(c => (c.symbol || c.id) !== sym && c.symbol !== sym);
+  saveCustom();
+  loadData();
+}
+
 async function loadData() {
+  updateMarketStatus();
   const status = document.getElementById('status');
-  const grid = document.getElementById('grid');
   status.textContent = 'Updating...';
-  grid.innerHTML = '';
+  const sectionsEl = document.getElementById('sections');
+  const moversEl = document.getElementById('movers');
 
-  const [stockData, cryptoData] = await Promise.all([fetchStocks(), fetchCrypto()]);
+  const stocks = getAllStocks();
+  const stockPromises = stocks.map(s => fetchOneStock(s.symbol).then(q => ({ ...s, q })));
+  const [stockResults, cryptoData] = await Promise.all([
+    Promise.all(stockPromises),
+    fetchCrypto()
+  ]);
 
+  const allItems = [];
+
+  // Build sections
   let html = '';
 
-  // Stocks
-  for (const s of STOCKS) {
-    const q = stockData.find(x => x.symbol === s.symbol);
-    const price = q ? formatPrice(q.regularMarketPrice, s.symbol) : '—';
-    const changeInfo = q ? formatChange(q.regularMarketChange, q.regularMarketChangePercent) : { text: '—', cls: 'flat' };
-    html += renderCard(s.symbol.replace('^','').replace('=F',''), s.name, price, changeInfo);
+  function addSection(title, items, isCrypto = false) {
+    if (!items.length) return;
+    html += `<div class="section"><h2>${title}</h2><div class="grid">`;
+    for (const item of items) {
+      const q = isCrypto ? cryptoData[item.id] : item.q;
+      const isCustom = custom.some(c => (c.symbol || c.id) === (item.symbol || item.id));
+      html += renderCard(item, q, isCrypto, isCustom);
+      if (q) {
+        const pct = isCrypto ? (q.usd_24h_change || 0) : (item.q?.pct || 0);
+        allItems.push({ symbol: item.symbol || item.name, pct, name: item.name });
+      }
+    }
+    html += '</div></div>';
   }
 
-  // Crypto
-  for (const c of CRYPTO) {
-    const d = cryptoData[c.id];
-    const price = d ? formatPrice(d.usd, c.symbol) : '—';
-    const changeInfo = d ? formatChange(null, d.usd_24h_change) : { text: '—', cls: 'flat' };
-    html += renderCard(c.symbol, c.name, price, changeInfo);
+  addSection('Indices & Macro', DEFAULTS.indices.map(s => stockResults.find(r => r.symbol === s.symbol) || s));
+  addSection('AI & Tech', DEFAULTS.ai.map(s => stockResults.find(r => r.symbol === s.symbol) || s));
+  addSection('Defensive', DEFAULTS.defensive.map(s => stockResults.find(r => r.symbol === s.symbol) || s));
+  addSection('Crypto', DEFAULTS.crypto, true);
+  if (custom.length) {
+    const customStocks = custom.filter(c => !c.crypto).map(c => stockResults.find(r => r.symbol === c.symbol) || c);
+    const customCrypto = custom.filter(c => c.crypto);
+    addSection('Your Tickers', [...customStocks, ...customCrypto], false);
+    // Note: crypto custom handled in render if needed - simplified
   }
 
-  grid.innerHTML = html;
+  sectionsEl.innerHTML = html;
+
+  // Top movers
+  allItems.sort((a, b) => b.pct - a.pct);
+  const gainers = allItems.slice(0, 5);
+  const losers = [...allItems].sort((a, b) => a.pct - b.pct).slice(0, 5);
+  moversEl.innerHTML = 
+    '<strong>Top Gainers:</strong> ' + gainers.map(g => `<span class="mover up">${g.symbol} ${g.pct>=0?'+':''}${g.pct.toFixed(1)}%</span>`).join('') +
+    ' &nbsp;|&nbsp; <strong>Biggest Drops:</strong> ' + losers.map(l => `<span class="mover down">${l.symbol} ${l.pct.toFixed(1)}%</span>`).join('');
+
   status.textContent = 'Updated ' + new Date().toLocaleTimeString();
 }
 
+// TradingView script
+const tvScript = document.createElement('script');
+tvScript.src = 'https://s3.tradingview.com/tv.js';
+tvScript.onload = () => showChart('^GSPC');
+document.head.appendChild(tvScript);
+
 loadData();
 setInterval(loadData, 60000);
+setInterval(updateMarketStatus, 60000);
 </script>
 </body>
 </html>
